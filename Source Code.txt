@@ -1,0 +1,93 @@
+import pandas as pd
+import streamlit as st
+import seaborn as sns
+import matplotlib.pyplot as plt
+import numpy as np
+
+# Function to load data from an uploaded Excel file
+def load_data(file):
+    return pd.read_excel(file, sheet_name=None)
+
+# Function to display mineral overview
+def display_mineral_overview(mineral_data):
+    # Display Stream, Number distribution
+    st.subheader("Distribution Overview")
+    fig_dist, ax_dist = plt.subplots(2, 2, figsize=(12, 8))
+
+    sns.histplot(mineral_data['Stream'], bins=20, kde=True, ax=ax_dist[0, 0])
+    ax_dist[0, 0].set_title("Stream Distribution")
+
+    sns.histplot(mineral_data['Number'], bins=20, kde=True, ax=ax_dist[0, 1])
+    ax_dist[0, 1].set_title("Number Distribution")
+
+    # Check if 'Distribution(Fe%)' column exists in the DataFrame
+    if 'Distribution(Fe%)' in mineral_data.columns:
+        sns.histplot(mineral_data['Distribution(Fe%)'], bins=20, kde=True, ax=ax_dist[1, 0])
+        ax_dist[1, 0].set_title("Distribution(Fe%)")
+
+    # Check if 'Distribution(Cu%)' column exists in the DataFrame
+    if 'Distribution(Cu%)' in mineral_data.columns:
+        sns.histplot(mineral_data['Distribution(Cu%)'], bins=20, kde=True, ax=ax_dist[1, 1])
+        ax_dist[1, 1].set_title("Distribution(Cu%)")
+
+    st.pyplot(fig_dist)
+
+    # Display liberated, middling, and locked distribution
+    st.subheader("Mineral Liberation Overview")
+    fig_lib, ax_lib = plt.subplots(1, 3, figsize=(18, 4))
+
+    sns.histplot(mineral_data['Liberated'], bins=20, kde=True, ax=ax_lib[0])
+    ax_lib[0].set_title("Liberated Distribution")
+
+    sns.histplot(mineral_data['Middling'], bins=20, kde=True, ax=ax_lib[1])
+    ax_lib[1].set_title("Middling Distribution")
+
+    sns.histplot(mineral_data['Locked'], bins=20, kde=True, ax=ax_lib[2])
+    ax_lib[2].set_title("Locked Distribution")
+
+    st.pyplot(fig_lib)
+
+# Main content
+uploaded_file = st.file_uploader("Upload Excel file", type=["xlsx", "xls"])
+
+if uploaded_file is not None:
+    sheets = load_data(uploaded_file)
+
+    if sheets is not None and sheets:
+        for sheet_name, sheet_data in sheets.items():
+            # Display sheet horizontally
+            st.subheader(f"Sheet: {sheet_name}")
+            st.dataframe(sheet_data)
+
+            # Sidebar with configuration options
+            with st.sidebar:
+                st.subheader("Filter Options")
+                date_column_options = [col for col in sheet_data.columns if pd.api.types.is_datetime64_any_dtype(sheet_data[col])]
+                if date_column_options:
+                    selected_date_column = st.selectbox("Select a date column:", date_column_options)
+                    start_date = st.date_input("Select start date:", sheet_data[selected_date_column].min())
+                    end_date = st.date_input("Select end date:", sheet_data[selected_date_column].max())
+
+                    # Convert date type to datetime64[ns]
+                    start_date = pd.to_datetime(start_date)
+                    end_date = pd.to_datetime(end_date)
+
+                    filtered_data = sheet_data[(sheet_data[selected_date_column] >= start_date) & (sheet_data[selected_date_column] <= end_date)]
+                else:
+                    st.warning("No date columns found in the selected data.")
+                    continue  # Skip to the next iteration if no date columns are found
+
+                st.subheader("Visualization Options")
+                mineral_options = sheet_data['Mineral'].unique()
+                selected_mineral = st.selectbox("Select a mineral:", mineral_options)
+
+            # Filter data based on selected mineral
+            mineral_data = filtered_data[filtered_data['Mineral'] == selected_mineral]
+
+            # Display mineral overview
+            display_mineral_overview(mineral_data)
+
+            # Add a separator between sheets
+            st.markdown("---")
+    else:
+        st.warning("No sheets to display.")
